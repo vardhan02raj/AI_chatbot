@@ -1,30 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>AI Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<div class="chat-container">
-  <h2>🤖 AI Chatbot</h2>
-  <div id="chat-box"></div>
+<div class="app-container">
+  <div class="chat-card">
+    <div class="chat-header">
+      <div>
+        <div class="title">🤖 AI Chatbot</div>
+        <div class="subtitle">Ask me anything</div>
+      </div>
+      <button class="clear-btn" id="clearBtn">🧹 Clear</button>
+    </div>
 
-  <div class="input-area">
-    <input id="userInput" placeholder="Type your message..." />
-    <button onclick="sendMessage()">Send</button>
+    <div id="chat-box" class="chat-box">
+      <div class="empty-state">👋 Start a conversation by typing a message below.</div>
+    </div>
+
+    <div class="input-area">
+      <input id="userInput" placeholder="Type your message..." autocomplete="off" />
+      <button id="sendBtn">➤</button>
+    </div>
   </div>
 </div>
 
 <script>
+const chatBox = document.getElementById("chat-box");
+const input = document.getElementById("userInput");
+const sendBtn = document.getElementById("sendBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+input.focus();
+
+function removeEmptyState() {
+  const empty = document.querySelector(".empty-state");
+  if (empty) empty.remove();
+}
+
+function addMessage(text, sender) {
+  removeEmptyState();
+  const msg = document.createElement("div");
+  msg.className = "message " + sender;
+  msg.innerText = text;
+
+  // Add copy button for bot messages
+  if (sender === "bot") {
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "copy-btn";
+    copyBtn.innerText = "📋";
+    copyBtn.title = "Copy";
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(text);
+      copyBtn.innerText = "✅";
+      setTimeout(() => copyBtn.innerText = "📋", 1000);
+    };
+    msg.appendChild(copyBtn);
+  }
+
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+let typingInterval = null;
+
+function addTyping() {
+  removeEmptyState();
+  const typing = document.createElement("div");
+  typing.className = "message bot typing";
+  typing.id = "typing-indicator";
+  typing.innerText = "AI is typing";
+  chatBox.appendChild(typing);
+
+  let dots = 0;
+  typingInterval = setInterval(() => {
+    dots = (dots + 1) % 4;
+    typing.innerText = "AI is typing" + ".".repeat(dots);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }, 400);
+}
+
+function removeTyping() {
+  if (typingInterval) {
+    clearInterval(typingInterval);
+    typingInterval = null;
+  }
+  const typing = document.getElementById("typing-indicator");
+  if (typing) typing.remove();
+}
+
 function sendMessage() {
-  let input = document.getElementById("userInput");
-  let message = input.value.trim();
+  const message = input.value.trim();
   if (!message) return;
 
-  let chatBox = document.getElementById("chat-box");
-  chatBox.innerHTML += `<div class="user">You: ${message}</div>`;
+  addMessage(message, "user");
   input.value = "";
+  input.focus();
+
+  addTyping();
+  sendBtn.disabled = true;
 
   fetch("/chat", {
     method: "POST",
@@ -33,10 +111,30 @@ function sendMessage() {
   })
   .then(res => res.json())
   .then(data => {
-    chatBox.innerHTML += `<div class="bot">AI: ${data.reply}</div>`;
-    chatBox.scrollTop = chatBox.scrollHeight;
+    removeTyping();
+    addMessage(data.reply, "bot");
+  })
+  .catch(() => {
+    removeTyping();
+    addMessage("Something went wrong. Please try again.", "bot");
+  })
+  .finally(() => {
+    sendBtn.disabled = false;
   });
 }
+
+sendBtn.addEventListener("click", sendMessage);
+
+input.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    sendMessage();
+  }
+});
+
+clearBtn.addEventListener("click", () => {
+  chatBox.innerHTML = `<div class="empty-state">👋 Start a conversation by typing a message below.</div>`;
+  input.focus();
+});
 </script>
 
 </body>
